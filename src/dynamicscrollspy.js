@@ -24,7 +24,8 @@
       offset: 100, //offset for scrollspy
       ulClassNames: 'hidden-print', //add this class to top-most UL
       activeClass: '', //active class (besides .active) to add
-      testing: false //if testing, show heading tagName and ID
+      testing: false, //if testing, show heading tagName and ID
+      outOfHierarchy: false
     }, this.options, opts);
 
     var self = this;
@@ -100,7 +101,7 @@
       });
     }
 
-    //setup the tree, (first level)
+    //setup the tree,dd (first level)
     function makeTree() {
       var tree = self.tree;
       $('H' + self.options.tH).not(self.options.exclude).each(function() {
@@ -118,6 +119,75 @@
 
       return tree;
     }
+
+    function makeTreeOutOfHierarchy() {
+      var tree = self.tree;
+      var tagList = [];
+      for (var i = self.options.tH; i <= self.options.bH; i++) {
+          tagList.push("H"+i);
+      }
+      var headings = getDepthFirstListOfHeadings($(document), tagList, []);
+      var lastHeading = null;
+      var lastHeadingSize = null;
+      var parentHeadings = [];
+      for (var i = 0; i < headings.length; i++) {
+          var thisHeading = headings[i];
+          var thisHeadingSize = Number(thisHeading.tagName.replace('H', ''));
+          if (!lastHeadingSize) {
+              self.tree[$(thisHeading).prop('id')] = {
+                  dstext: encodeHTML($(thisHeading).text()),
+                  jqel: $(thisHeading)
+              };
+          } else if (thisHeadingSize > lastHeadingSize) {
+              if (parentHeadings.indexOf(lastHeading) < 0) {
+                  parentHeadings.push(lastHeading);
+              }
+              var treeToAppend = getTreeElemWithParents(self.tree, parentHeadings);
+              treeToAppend[$(thisHeading).prop('id')] = {
+                  dstext: encodeHTML($(thisHeading).text()),
+                  jqel: $(thisHeading)
+              };
+          } else if (thisHeadingSize == lastHeadingSize) {
+              var treeToAppend = getTreeElemWithParents(self.tree, parentHeadings);
+              treeToAppend[$(thisHeading).prop('id')] = {
+                  dstext: encodeHTML($(thisHeading).text()),
+                  jqel: $(thisHeading)
+              };
+          } else {
+              parentHeadings.pop();
+              var treeToAppend = getTreeElemWithParents(self.tree, parentHeadings);
+              treeToAppend[$(thisHeading).prop('id')] = {
+                  dstext: encodeHTML($(thisHeading).text()),
+                  jqel: $(thisHeading)
+              };
+          }
+          lastHeadingSize = thisHeadingSize;
+          lastHeading = thisHeading;
+      }
+  }
+
+  function getTreeElemWithParents(tree, parentHeadings) {
+    if (!parentHeadings || parentHeadings.length === 0) {
+        return tree;
+    }
+    if (parentHeadings.length === 1) {
+        return tree[$(parentHeadings[0]).prop('id')];
+    } else {
+        return getTreeElemWithParents(tree[$(parentHeadings[0]).prop('id')], parentHeadings.slice(1, parentHeadings.length));
+    }
+  }
+
+  function getDepthFirstListOfHeadings(currentElem, tagList, headingsList) {
+    $(currentElem).children().each(function(iter, elem) {
+        if (tagList.indexOf(elem.tagName) > -1) {
+            if (self.options.exclude && !$(elem).is(self.options.exclude)) {
+                headingsList.push(elem);
+            }
+        }
+        return getDepthFirstListOfHeadings(elem, tagList, headingsList);
+    });
+    return headingsList;
+  }
 
     //iterate through each grandchild+ level of the tree
     function itCreateTree(what) {
@@ -189,7 +259,11 @@
         if (self.options.testing) showTesting();
 
         //make the tree
-        makeTree();
+        if (self.options.outOfHierarchy) {
+          makeTreeOutOfHierarchy();
+        } else {
+          makeTree();
+        }
         //render it
         renderTree();
 
@@ -221,7 +295,11 @@
         self.isinit = true;
       } else {
 
-        makeTree();
+        if (self.options.outOfHierarchy) {
+          makeTreeOutOfHierarchy();
+        } else {
+          makeTree();
+        }
 
         renderTree();
 
